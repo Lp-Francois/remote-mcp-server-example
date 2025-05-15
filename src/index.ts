@@ -17,7 +17,7 @@ export class MyMCP extends McpAgent {
 
 		this.server.tool(
       "getPokemonInfo",
-      "Get information about a Pokemon from PokeAPI",
+      "Get information about a Pokemon from PokeAPI, including abilities and their effects.",
       {
         pokemon: z.string().describe("The name or ID of the Pokemon to query"),
       },
@@ -37,15 +37,66 @@ export class MyMCP extends McpAgent {
               ],
             };
           }
-          const data: { name: string; base_experience: number } =
-            await response.json();
+          const data: {
+            name: string;
+            base_experience: number;
+            abilities: { ability: { name: string; url: string } }[];
+          } = await response.json();
           const name = data.name;
           const baseExperience = data.base_experience;
+          const abilities = data.abilities;
+
+          // Fetch ability details in parallel
+          const abilityDetails = await Promise.all(
+            abilities.map(async (ab) => {
+              const abilityRes = await fetch(ab.ability.url);
+              if (!abilityRes.ok) return null;
+              const abilityData: {
+                names: { name: string; language: { name: string } }[];
+                effect_entries: {
+                  effect: string;
+                  short_effect: string;
+                  language: { name: string };
+                }[];
+                flavor_text_entries?: {
+                  flavor_text: string;
+                  language: { name: string };
+                }[];
+              } = await abilityRes.json();
+              // Find English name, effect, and flavor text
+              const nameEntry = abilityData.names.find(
+                (n: any) => n.language.name === "en"
+              );
+              const effectEntry = abilityData.effect_entries.find(
+                (e: any) => e.language.name === "en"
+              );
+              const flavorEntry = abilityData.flavor_text_entries?.find(
+                (f: any) => f.language.name === "en"
+              );
+              return {
+                name: nameEntry?.name || ab.ability.name,
+                effect: effectEntry?.effect || "",
+                short_effect: effectEntry?.short_effect || "",
+                flavor_text: flavorEntry?.flavor_text || "",
+              };
+            })
+          );
+
+          const abilityDescriptions = abilityDetails
+            .filter(Boolean)
+            .map(
+              (ad) =>
+                `Ability: ${ad!.name}\nEffect: ${ad!.short_effect}\n${
+                  ad!.flavor_text ? `Flavor: ${ad!.flavor_text}` : ""
+                }`
+            )
+            .join("\n\n");
+
           return {
             content: [
               {
                 type: "text",
-                text: `Pokemon: ${name}, Base Experience: ${baseExperience}`,
+                text: `Pokemon: ${name}, Base Experience: ${baseExperience}\n\n${abilityDescriptions}`,
               },
             ],
           };
