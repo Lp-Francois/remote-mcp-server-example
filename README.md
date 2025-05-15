@@ -5,6 +5,16 @@ Let's get a remote MCP server up-and-running on Cloudflare Workers complete with
 ## Develop locally
 
 ```bash
+# in 1 term:
+npm run dev
+
+# in another term:
+npx @modelcontextprotocol/inspector@0.11.0
+# latest might not work with oauth if latest is 0.12.0
+
+########
+# deprecated below:
+
 # clone the repository
 git clone git@github.com:cloudflare/ai.git
 
